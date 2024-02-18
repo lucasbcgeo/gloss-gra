@@ -1,0 +1,213 @@
+FIRST ATTEMPT
+
+ -----------------------------
+module.exports = async ({ app, quickAddApi }) => {
+
+    // Coleta o nome do arquivo no início
+    const fileName = await quickAddApi.inputPrompt('Nome do Arquivo');
+
+
+
+    // Inicializando as listas e valores simples
+    let termosPais = []; // Lista com links do Obsidian
+    let termosIrmãos = []; // Outra lista com links do Obsidian
+    let termosFilhos = []; // Outra lista com links do Obsidian
+    let fontes = []; // Lista simples sem links
+    let definicao = ""; // Valor simples
+    let contexto = ""; // Valor simples
+    let exemplo = ""; // Valor simples
+    let aliases = [];
+    let conceitosRelacionados = [];
+
+    // Coleta de termos pais
+    while (true) {
+        const termoPai = await quickAddApi.inputPrompt("Adicione um Termo Pai (ou deixe vazio para terminar):");
+        if (termoPai.trim() === "") break;
+        termosPais.push(termoPai);
+    }
+
+    // Coleta de termos irmãos
+    while (true) {
+        const termoIrmao = await quickAddApi.inputPrompt("Adicione um Termo Irmão (ou deixe vazio para terminar):");
+        if (termoIrmao.trim() === "") break;
+        termosIrmãos.push(termoIrmao);
+    }
+
+    // Coleta de termos filhos
+    while (true) {
+        const termoFilho = await quickAddApi.inputPrompt("Adicione um Termo Filho (ou deixe vazio para terminar):");
+        if (termoFilho.trim() === "") break;
+        termosFilhos.push(termoFilho);
+    }
+
+    // Coleta de fontes
+    while (true) {
+        const fonte = await quickAddApi.inputPrompt("Adicione uma Fonte (ou deixe vazio para terminar):");
+        if (fonte.trim() === "") break;
+        fontes.push(fonte);
+    }
+
+    while (true) {
+        const aliase = await quickAddApi.inputPrompt("Adicione um aliase (ou deixe vazio para terminar):");
+        if (aliase.trim() === "") break;
+        aliases.push(aliase);
+    }
+
+    while (true) {
+        const conceitoRelacionado = await quickAddApi.inputPrompt("Adicione um Termo Pai (ou deixe vazio para terminar):");
+        if (conceitoRelacionado.trim() === "") break;
+        conceitosRelacionados.push(conceitoRelacionado);
+    }
+
+
+    // Coleta da definição
+    definicao = await quickAddApi.inputPrompt("Definição");
+    contexto = await quickAddApi.inputPrompt("Contexto");
+    exemplo = await quickAddApi.inputPrompt("Exemplo");
+
+    // Formatação dos valores coletados para inserção no template
+    const formattedTermosPais = termosPais.map(termo => `  - [[${termo}]]`).join('\n');
+    const formattedTermosIrmãos = termosIrmãos.map(termo => `  - [[${termo}]]`).join('\n');
+    const formattedTermosFilhos = termosFilhos.map(termo => `  - [[${termo}]]`).join('\n');
+    const formattedFontes = fontes.map(fonte => `  - ${fonte}`).join('\n');
+    const formattedAliases = aliases.map(termo => `  - [[${termo}]]`).join('\n');
+    const formattedConceitosRelacionados = conceitosRelacionados.map(termo => `  - [[${termo}]]`).join('\n');
+
+
+    // Caminho para o template e carregamento do conteúdo
+
+    
+    const templatePath = 'Dispensa/Templates/GlossárioT/Glossário-Programação.md';
+    let templateContent = await app.vault.adapter.read(templatePath);
+
+
+    // Substituição dos placeholders no template pelos valores formatados
+    // Substituição dos placeholders no template pelos valores formatados
+    templateContent = templateContent.replace("{{VALUE:termosPais}}", formattedTermosPais)
+                                 .replace("{{VALUE:termosIrmãos}}", formattedTermosIrmãos)
+                                 .replace("{{VALUE:termosFilhos}}", formattedTermosFilhos)
+                                 .replace("{{VALUE:fontes}}", formattedFontes)
+                                 .replace("{{VALUE:contexto}}", contexto)
+                                 .replace("{{VALUE:exemplo}}", exemplo)
+                                 .replace("{{VALUE:definicao}}", definicao)
+                                 .replace("{{VALUE:aliases}}", formattedAliases) // Supondo que você queira juntar todos os aliases em uma string separada por vírgulas
+                                 .replace("{{VALUE:conceitosRelacionados}}", formattedConceitosRelacionados); // Similarmente para conceitos relacionados
+
+
+    // Criação da nova nota no diretório especificado com o conteúdo modificado
+    const newFilePath = `Dispensa/data base/Glossário/${fileName}.md`;
+    await app.vault.create(newFilePath, templateContent);
+
+
+
+    // Opção para ser redirecionado para a nova nota após a criação
+    const redirectToNote = await quickAddApi.yesNoPrompt('Deseja ser redirecionado para a nova nota?');
+    if (redirectToNote) {
+        const newNote = await app.vault.getAbstractFileByPath(newFilePath);
+        app.workspace.activeLeaf.openFile(newNote);
+    }
+};
+
+----------
+
+Second Attempt
+
+// Função para formatar listas de links do Obsidian baseada no delimitador >[
+    function formatAsObsidianLinks(input) {
+        if (!input || input.trim() === "") return "";
+        // Divide a string de entrada em um array de termos usando >[ como delimitador
+        const terms = input.split(">[")
+                          .map(term => term.trim())
+                          .filter(term => term !== "");
+        // Formata cada termo como link do Obsidian
+        return terms.map(term => `  - [[${term}]]`).join('\n');
+    }
+
+// Função para tratar valores simples
+function formatSimpleValue(input) {
+    return input ? input : "";
+}
+
+// Função para tratar listas simples sem converter em links
+function formatAsList(input) {
+    if (!input || input.trim() === "") return "";
+    // Delimitador escolhido para separar itens na lista. Ajuste conforme necessário.
+    const delimiter = ">";
+    const specialChars = /[:{}\[\],&*#?|<>=!%@`]/; // Define caracteres especiais
+    const items = input.split(delimiter)
+                       .map(item => item.trim())
+                       .filter(item => item !== "");
+
+    const formattedItems = items.map(item => {
+        // Verifica se o item contém caracteres especiais
+        if (specialChars.test(item)) {
+            // Adiciona aspas ao redor do item se contiver caracteres especiais
+            return `  - "${item}"`;
+        } else {
+            // Mantém o item sem aspas se não contiver caracteres especiais
+            return `  - ${item}`;
+        }
+    });
+
+    return formattedItems.join('\n');
+}
+
+
+
+function formatAsList(input) {
+    if (!input || input.trim() === "") return "";
+    
+    const items = input.split("|").map(item => item.trim());
+    const formattedItems = items.map(item => `  - ${item}`).join('\n');
+    
+    return formattedItems;
+}
+
+
+module.exports = async ({ app, quickAddApi }) => {
+    const vault = app.vault;
+
+    // Caminho para o template
+    const templatePath = 'Dispensa/Templates/GlossárioT/Glossário-Programação.md';
+
+    // Coleta valores via prompts
+    const fileName = await quickAddApi.inputPrompt('Nome do Arquivo');
+    const aliases = await quickAddApi.inputPrompt('Aliases');
+    const termosPais = await quickAddApi.inputPrompt('Termos Pais (separe com ">["');
+    const termosIrmãos = await quickAddApi.inputPrompt('Termos Irmãos (separe com ">["');
+    const termosFilhos = await quickAddApi.inputPrompt('Termos Filhos (separe com ">["');
+    const fonte = await quickAddApi.inputPrompt('Fonte (separe com ">"');
+    const definicao = await quickAddApi.inputPrompt('Definição');
+    const contexto = await quickAddApi.inputPrompt('Contexto');
+    const exemplo = await quickAddApi.inputPrompt('Exemplo');
+    const conceitosRelacionados = await quickAddApi.inputPrompt('Conceitos Relacionados (separe com ">["');
+
+    // Carrega o conteúdo do template
+    let templateContent = await vault.adapter.read(templatePath);
+
+    // Substitui placeholders pelos valores coletados
+    templateContent = templateContent.replace("{{VALUE:aliases}}", `"${formatSimpleValue(aliases)}"`);
+    templateContent = templateContent.replace("{{VALUE:termosPais}}", formatAsObsidianLinks(termosPais));
+    templateContent = templateContent.replace("{{VALUE:termosIrmãos}}", formatAsObsidianLinks(termosIrmãos));
+    templateContent = templateContent.replace("{{VALUE:termosFilhos}}", formatAsObsidianLinks(termosFilhos));
+    templateContent = templateContent.replace("{{VALUE:fonte}}", formatAsList(fonte));
+    templateContent = templateContent.replace("{{VALUE:definicao}}", definicao);
+    templateContent = templateContent.replace("{{VALUE:contexto}}", contexto);
+    templateContent = templateContent.replace("{{VALUE:exemplo}}", exemplo);
+    templateContent = templateContent.replace("{{VALUE:conceitosRelacionados}}", formatAsObsidianLinks(conceitosRelacionados));
+
+    // Cria a nova nota no diretório especificado
+    const newFilePath = `Dispensa/data base/Glossário/${fileName}.md`;
+    await vault.create(newFilePath, templateContent);
+
+
+    // Opção para ser redirecionado para a nova nota após a criação
+    const redirectToNote = await quickAddApi.inputPrompt('Deseja ser redirecionado para a nova nota? (s/n)');
+    if (redirectToNote.toLowerCase() === 's') {
+        const newNote = await vault.getAbstractFileByPath(newFilePath);
+        if (newNote) {
+            app.workspace.activeLeaf.openFile(newNote);
+        }
+    }
+};
+
